@@ -20,8 +20,9 @@ from warcio.archiveiterator import ArchiveIterator
 from urllib.parse import urljoin
 import json
 import re
+import urlcanon
 
-batch_size = 1000   # TODO: should not be hard coded
+batch_size = 1000  # TODO: should not be hard coded
 record_count = 1
 node_id = 1
 edge_id = 1
@@ -35,10 +36,11 @@ for i in range(1, len(sys.argv)):
         for record in ArchiveIterator(stream):
             if record_count <= batch_size:
                 if record.rec_type == 'metadata':
-                    warc_target_uri = record.rec_headers.get_header('WARC-Target-URI')
+                    warc_target_uri = urlcanon.parse_url(record.rec_headers.get_header('WARC-Target-URI'))
+                    urlcanon.whatwg(warc_target_uri)  # canonicalization
 
                     # select only members whose WARC-Target-URI begins with "https?://"
-                    if re.search("^https?://", warc_target_uri):
+                    if re.search("^https?://", str(warc_target_uri)):
                         warc_date = record.rec_headers.get_header('WARC-Date')
 
                         # construct node with timestamp (VersionNode)
@@ -46,7 +48,7 @@ for i in range(1, len(sys.argv)):
                             "an": {
                                 node_id:
                                 {
-                                    "url": warc_target_uri,
+                                    "url": str(warc_target_uri.ssurt(), encoding='utf-8'),
                                     "timestamp": warc_date,
                                     "TYPE": "VersionNode"
                                 }
@@ -64,47 +66,45 @@ for i in range(1, len(sys.argv)):
                         except:
                             links = ''
 
-                        outlinks = []
-
                         # loop on links if not empty and get all urls
                         if links != '':
                             for link in links:
                                 # this is for empty outlink elements, maybe a bug in webarchive-commons used to generate WAT
                                 try:
-                                    url = urljoin(warc_target_uri, link["url"])
+                                    # convert relative outlink to absolute one
+                                    url = urljoin(str(warc_target_uri), link["url"])
+                                    urlcanon.whatwg(url)  # canonicalization
 
-                                    # construct node and edge
-
-                                    node = json.dumps({
-                                        "an": {
-                                            node_id:
-                                            {
-                                                "url": warc_target_uri,
-                                                "TYPE": "Node"
-                                            }
-                                        }
-                                    })
-                                    print(node)
-
-                                    edge = json.dumps({
-                                        "ae": {
-                                            edge_id:
-                                            {
-                                                "directed": "true",
-                                                "source": source_id,
-                                                "target": node_id
-                                            }
-                                        }
-                                    })
-                                    print(edge)
-
-                                    node_id += 1
-                                    edge_id += 1
-
-                                    # append only urls that begin with "https?://"
+                                    # match only urls that begin with "https?://"
                                     if re.search("^https?://", url):
-                                        outlinks.append(url)
 
+                                        # construct node and edge
+
+                                        node = json.dumps({
+                                            "an": {
+                                                node_id:
+                                                {
+                                                    "url": str(urlcanon.parse_url(url).ssurt(), encoding="utf-8"),
+                                                    "TYPE": "Node"
+                                                }
+                                            }
+                                        })
+                                        print(node)
+
+                                        edge = json.dumps({
+                                            "ae": {
+                                                edge_id:
+                                                {
+                                                    "directed": "true",
+                                                    "source": source_id,
+                                                    "target": node_id
+                                                }
+                                            }
+                                        })
+                                        print(edge)
+
+                                        node_id += 1
+                                        edge_id += 1
                                 except:
                                     continue
 
