@@ -21,11 +21,13 @@ from urllib.parse import urljoin
 import json
 import re
 import urlcanon
+import requests
 
 batch_size = 1000  # TODO: should not be hard coded
 record_count = 1
 node_id = 1
 edge_id = 1
+body = []
 
 # accept multiple WAT files as command-line arguments
 for i in range(1, len(sys.argv)):
@@ -36,9 +38,14 @@ for i in range(1, len(sys.argv)):
         for record in ArchiveIterator(stream):
             if record_count > batch_size:
                 node_id = edge_id = record_count = 1
+                request_body = json.dumps(body)
 
-                # TODO: send to link-serv
+                # send to link-serv
                 print("...SEND TO LINK-SERV...")
+                requests.post("http://localhost:8080/?operation=updateGraph", data=request_body)
+                print(request_body)
+
+                body = []
 
             if record.rec_type != 'metadata':
                 continue
@@ -50,23 +57,17 @@ for i in range(1, len(sys.argv)):
             if not re.search("^https?://", str(warc_target_uri)):
                 continue
 
-            warc_date = record.rec_headers.get_header('WARC-Date')
-
             # construct node with timestamp (VersionNode)
-            version_node = json.dumps({
+            version_node = {
                 "an": {
                     node_id:
                     {
                         "url": str(warc_target_uri.ssurt(), encoding='utf-8'),
-                        "timestamp": warc_date,
+                        "timestamp": record.rec_headers.get_header('WARC-Date'),
                         "TYPE": "VersionNode"
                     }
                 }
-            })
-            print(version_node)
-
-            source_id = node_id
-            node_id += 1
+            }
 
             content = json.loads(record.raw_stream.read())
 
@@ -78,6 +79,11 @@ for i in range(1, len(sys.argv)):
             # loop on links if not empty and get all urls
             if links == '':
                 continue
+
+            body.append(version_node)
+
+            source_id = node_id
+            node_id += 1
 
             for link in links:
                 # this is for empty outlink elements, maybe a bug in webarchive-commons used to generate WAT
@@ -91,8 +97,7 @@ for i in range(1, len(sys.argv)):
                         continue
 
                     # construct node and edge
-
-                    node = json.dumps({
+                    node = {
                         "an": {
                             node_id:
                             {
@@ -100,10 +105,9 @@ for i in range(1, len(sys.argv)):
                                 "TYPE": "Node"
                             }
                         }
-                    })
-                    print(node)
+                    }
 
-                    edge = json.dumps({
+                    edge = {
                         "ae": {
                             edge_id:
                             {
@@ -112,8 +116,10 @@ for i in range(1, len(sys.argv)):
                                 "target": node_id
                             }
                         }
-                    })
-                    print(edge)
+                    }
+
+                    body.append(node)
+                    body.append(edge)
 
                     node_id += 1
                     edge_id += 1
