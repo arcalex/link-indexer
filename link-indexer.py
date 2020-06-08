@@ -38,7 +38,7 @@ for i in range(1, len(sys.argv)):
         for record in ArchiveIterator(stream):
             if record_count > batch_size:
                 node_id = edge_id = record_count = 1
-                request_body = json.dumps(body)
+                request_body = ''.join(body)
 
                 # send to link-serv
                 print("...SEND TO LINK-SERV...")
@@ -69,6 +69,16 @@ for i in range(1, len(sys.argv)):
                 }
             }
 
+            # \r is required as separator in the Gephi streaming format
+
+            # https://github.com/gephi/gephi/wiki/GraphStreaming#Supported_formats
+
+            body.append(json.dumps(version_node))
+            body.append('\r\n')
+
+            source_id = node_id
+            node_id += 1
+
             content = json.loads(record.raw_stream.read())
 
             try:
@@ -78,12 +88,8 @@ for i in range(1, len(sys.argv)):
 
             # loop on links if not empty and get all urls
             if links == '':
+                record_count += 1
                 continue
-
-            body.append(version_node)
-
-            source_id = node_id
-            node_id += 1
 
             for link in links:
                 # this is for empty outlink elements, maybe a bug in webarchive-commons used to generate WAT
@@ -112,14 +118,17 @@ for i in range(1, len(sys.argv)):
                             edge_id:
                             {
                                 "directed": "true",
-                                "source": source_id,
-                                "target": node_id
+                                "source": str(source_id),
+                                "target": str(node_id)
                             }
                         }
                     }
 
-                    body.append(node)
-                    body.append(edge)
+                    body.append(json.dumps(node))
+                    body.append('\r\n')
+
+                    body.append(json.dumps(edge))
+                    body.append('\r\n')
 
                     node_id += 1
                     edge_id += 1
