@@ -29,6 +29,14 @@ node_id = 1
 edge_id = 1
 body = []
 
+
+def update_graph(url, body):
+    # send to link-serv
+    print("...SEND TO LINK-SERV...")
+    requests.post(url, data=body)
+    print(body)
+
+
 # accept multiple WAT files as command-line arguments
 for i in range(1, len(sys.argv)):
     wat_file = str(sys.argv[i])
@@ -40,10 +48,7 @@ for i in range(1, len(sys.argv)):
                 node_id = edge_id = record_count = 1
                 request_body = ''.join(body)
 
-                # send to link-serv
-                print("...SEND TO LINK-SERV...")
-                requests.post("http://localhost:8080/?operation=updateGraph", data=request_body)
-                print(request_body)
+                update_graph("http://localhost:8080/?operation=updateGraph", request_body)
 
                 body = []
 
@@ -78,6 +83,7 @@ for i in range(1, len(sys.argv)):
 
             source_id = node_id
             node_id += 1
+            record_count += 1
 
             content = json.loads(record.raw_stream.read())
 
@@ -88,7 +94,6 @@ for i in range(1, len(sys.argv)):
 
             # loop on links if not empty and get all urls
             if links == '':
-                record_count += 1
                 continue
 
             for link in links:
@@ -135,4 +140,4 @@ for i in range(1, len(sys.argv)):
                 except:
                     continue
 
-            record_count += 1
+update_graph("http://localhost:8080/?operation=updateGraph", request_body)
