@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import sys
+import argparse
 from warcio.archiveiterator import ArchiveIterator
 from urllib.parse import urljoin
 import json
@@ -23,32 +23,39 @@ import re
 import urlcanon
 import requests
 
-batch_size = 1000  # TODO: should not be hard coded
 record_count = 1
 node_id = 1
 edge_id = 1
 body = []
+
+# accept multiple WAT files as command-line arguments
+my_parser = argparse.ArgumentParser()
+my_parser.add_argument('wats', metavar='wats', nargs='+', help='list of WAT files')
+my_parser.add_argument('--host', action='store', default='localhost')
+my_parser.add_argument('--port', action='store', type=int, default=8080)
+my_parser.add_argument('--batch_size', action='store', type=int, default=1000)
+
+args = my_parser.parse_args()
 
 
 def update_graph(url, body):
     # send to link-serv
     print("...SEND TO LINK-SERV...")
     requests.post(url, data=body)
-    print(body)
+    # print(body)
 
 
-# accept multiple WAT files as command-line arguments
-for i in range(1, len(sys.argv)):
-    wat_file = str(sys.argv[i])
+for i in range(0, len(args.wats)):
+    wat_file = str(args.wats[i])
 
     with open(wat_file, 'rb') as stream:
         # loop on every record in WAT
         for record in ArchiveIterator(stream):
-            if record_count > batch_size:
+            if record_count > args.batch_size:
                 node_id = edge_id = record_count = 1
                 request_body = ''.join(body)
 
-                update_graph("http://localhost:8080/?operation=updateGraph", request_body)
+                update_graph("http://%s:%s/?operation=updateGraph" % (args.host, args.port), request_body)
 
                 body = []
 
@@ -140,4 +147,4 @@ for i in range(1, len(sys.argv)):
                 except:
                     continue
 
-update_graph("http://localhost:8080/?operation=updateGraph", request_body)
+update_graph("http://%s:%s/?operation=updateGraph" % (args.host, args.port), request_body)
