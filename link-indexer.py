@@ -92,7 +92,7 @@ for i in range(0, len(args.wats)):
             node_id += 1
             record_count += 1
 
-            content = json.loads(record.raw_stream.read())
+            content = json.loads(record.raw_stream.read().decode('utf-8'))
 
             try:
                 links = content["Envelope"]["Payload-Metadata"]["HTTP-Response-Metadata"]["HTML-Metadata"]["Links"]
