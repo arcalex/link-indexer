@@ -15,9 +15,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import sys
+import os
 import argparse
 from warcio.archiveiterator import ArchiveIterator
 from urllib.parse import urljoin
+from datetime import datetime
 import json
 import re
 import urlcanon
@@ -27,6 +30,13 @@ record_count = 1
 node_id = 1
 edge_id = 1
 body = []
+
+batch = 0
+
+# Cumulative total counts
+wats = 0
+records = 0
+nodes = 0
 
 # accept multiple WAT files as command-line arguments
 my_parser = argparse.ArgumentParser()
@@ -39,20 +49,27 @@ args = my_parser.parse_args()
 
 
 def update_graph(url, body):
-    # send to link-serv
-    print("...SEND TO LINK-SERV...")
-    requests.post(url, data=body)
-    # print(body)
+    response = requests.post(url, data=body)
+
+    print("%s %s: wats=%d batch=%d records=%d nodes=%d status=%d" % (
+        datetime.now().strftime("%b %d %H:%M:%S"),
+        os.path.basename(wat_file),
+        wats, batch, records, nodes, response.status_code), file=sys.stderr, flush=True)
+
+    if not response.ok:
+        print("ERROR: %s" % response.content, file=sys.stderr, flush=True)
 
 
 for i in range(0, len(args.wats)):
     wat_file = str(args.wats[i])
+    wats += 1
 
     with open(wat_file, 'rb') as stream:
         # loop on every record in WAT
         for record in ArchiveIterator(stream):
             if record_count > args.batch_size:
                 node_id = edge_id = record_count = 1
+                batch += 1
                 request_body = ''.join(body)
 
                 update_graph("http://%s:%s/?operation=updateGraph" % (args.host, args.port), request_body)
@@ -91,6 +108,7 @@ for i in range(0, len(args.wats)):
             source_id = node_id
             node_id += 1
             record_count += 1
+            records += 1
 
             content = json.loads(record.raw_stream.read().decode('utf-8'))
 
@@ -144,6 +162,7 @@ for i in range(0, len(args.wats)):
 
                     node_id += 1
                     edge_id += 1
+                    nodes += 1
                 except:
                     continue
 
