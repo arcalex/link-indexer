@@ -44,6 +44,7 @@ my_parser.add_argument('wats', metavar='wats', nargs='+', help='list of WAT file
 my_parser.add_argument('--host', action='store', default='localhost')
 my_parser.add_argument('--port', action='store', type=int, default=8080)
 my_parser.add_argument('--batch_size', action='store', type=int, default=1000)
+my_parser.add_argument('--max_url_length', action='store', type=int, default=2000)
 
 args = my_parser.parse_args()
 
@@ -83,7 +84,7 @@ for i in range(0, len(args.wats)):
             urlcanon.whatwg(warc_target_uri)  # canonicalization
 
             # select only members whose WARC-Target-URI begins with "https?://"
-            if not re.search("^https?://", str(warc_target_uri)):
+            if not re.search("^https?://", str(warc_target_uri)) or len(str(warc_target_uri)) > args.max_url_length:
                 continue
 
             # construct node with timestamp (VersionNode)
@@ -129,7 +130,7 @@ for i in range(0, len(args.wats)):
                     urlcanon.whatwg(url)  # canonicalization
 
                     # match only urls that begin with "https?://"
-                    if not re.search("^https?://", url):
+                    if not re.search("^https?://", url) or len(str(url)) > args.max_url_length:
                         continue
 
                     # construct node and edge
