@@ -15,16 +15,17 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import sys
 import os
-import argparse
-from warcio.archiveiterator import ArchiveIterator
-from urllib.parse import urljoin
-from datetime import datetime
-import json
 import re
+import sys
+import json
 import urlcanon
+import argparse
 import requests
+from retry.api import retry
+from datetime import datetime
+from urllib.parse import urljoin
+from warcio.archiveiterator import ArchiveIterator
 
 record_count = 1
 node_id = 1
@@ -43,14 +44,17 @@ my_parser = argparse.ArgumentParser()
 my_parser.add_argument('wats', metavar='wats', nargs='+', help='list of WAT files')
 my_parser.add_argument('--host', action='store', default='localhost')
 my_parser.add_argument('--port', action='store', type=int, default=8080)
+my_parser.add_argument('--retries', action='store', type=int, default=3)
+my_parser.add_argument('--timeout', action='store', type=int, default=90)
 my_parser.add_argument('--batch_size', action='store', type=int, default=1000)
 my_parser.add_argument('--max_url_length', action='store', type=int, default=2000)
 
 args = my_parser.parse_args()
 
 
+@retry(tries=args.retries)
 def update_graph(url, body):
-    response = requests.post(url, data=body)
+    response = requests.post(url, data=body, timeout=args.timeout)
 
     print("%s %s: wats=%d batch=%d records=%d nodes=%d status=%d" % (
         datetime.now().strftime("%b %d %H:%M:%S"),
