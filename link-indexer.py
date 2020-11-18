@@ -22,6 +22,7 @@ import json
 import urlcanon
 import argparse
 import requests
+import dateutil.parser as dp
 from retry.api import retry
 from datetime import datetime
 from urllib.parse import urljoin
@@ -44,10 +45,11 @@ my_parser = argparse.ArgumentParser()
 my_parser.add_argument('wats', metavar='wats', nargs='+', help='list of WAT files')
 my_parser.add_argument('--host', action='store', default='localhost')
 my_parser.add_argument('--port', action='store', type=int, default=8080)
+my_parser.add_argument('--batch_size', action='store', type=int, default=1000)
 my_parser.add_argument('--retries', action='store', type=int, default=3)
 my_parser.add_argument('--timeout', action='store', type=int, default=90)
-my_parser.add_argument('--batch_size', action='store', type=int, default=1000)
 my_parser.add_argument('--max_url_length', action='store', type=int, default=2000)
+my_parser.add_argument('--dt14', action='store_true')
 
 args = my_parser.parse_args()
 
@@ -91,13 +93,18 @@ for i in range(0, len(args.wats)):
             if not re.search("^https?://", str(warc_target_uri)) or len(str(warc_target_uri)) > args.max_url_length:
                 continue
 
+            datetime = record.rec_headers.get_header('WARC-Date')
+
+            if args.dt14:
+                datetime = dp.parse(datetime).strftime('%Y%m%d%H%M%S')
+
             # construct node with timestamp (VersionNode)
             version_node = {
                 "an": {
                     node_id:
                     {
                         "url": str(warc_target_uri.ssurt(), encoding='utf-8'),
-                        "timestamp": record.rec_headers.get_header('WARC-Date'),
+                        "timestamp": datetime,
                         "TYPE": "VersionNode"
                     }
                 }
