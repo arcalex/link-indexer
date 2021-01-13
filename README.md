@@ -1,5 +1,5 @@
 # link-indexer
-data collection tool for web archive visualization (LinkGate)
+data collection tool for web archive graph visualization (LinkGate)
 
 link-indexer is the tool that runs on web archive storage where WARC/ARC
 files are kept and collects outlinks data to feed to link-serv to load
@@ -34,3 +34,11 @@ execution on multiple hosts in a distributed environment.  You may also
 use a configuration management tool (again, such as Ansible) to
 configure a cronjob or similar on each host in the distributed
 environment to periodically execute link-indexer.
+
+## Prerequisites
+
+Install the following prerequisites:
+
+```
+# pip3 install warcio urlcanon python-dateutil retry
+```
