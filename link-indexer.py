@@ -23,6 +23,7 @@ import urlcanon
 import argparse
 import requests
 import dateutil.parser as dp
+import traceback
 from retry.api import retry
 from datetime import datetime
 from urllib.parse import urljoin
@@ -50,6 +51,7 @@ my_parser.add_argument('--retries', action='store', type=int, default=3)
 my_parser.add_argument('--timeout', action='store', type=int, default=90)
 my_parser.add_argument('--max_url_length', action='store', type=int, default=2000)
 my_parser.add_argument('--dt14', action='store_true')
+my_parser.add_argument('--ignore_errors', action='store_true')
 
 args = my_parser.parse_args()
 
@@ -79,7 +81,15 @@ for i in range(0, len(args.wats)):
                 batch += 1
                 request_body = ''.join(body)
 
-                update_graph("http://%s:%s/?operation=updateGraph" % (args.host, args.port), request_body)
+                try:
+                    update_graph("http://%s:%s/?operation=updateGraph" % (args.host, args.port), request_body)
+                except Exception as exc:
+                    traceback.print_exc()
+
+                    if args.ignore_errors:
+                        continue
+                    else:
+                        sys.exit(1)
 
                 body = []
 
