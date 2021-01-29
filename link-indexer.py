@@ -113,7 +113,7 @@ for i in range(0, len(args.wats)):
                 "an": {
                     node_id:
                     {
-                        "url": str(warc_target_uri.ssurt(), encoding='utf-8'),
+                        "identifier": str(warc_target_uri.ssurt(), encoding='utf-8'),
                         "timestamp": datetime,
                         "TYPE": "VersionNode"
                     }
@@ -159,7 +159,7 @@ for i in range(0, len(args.wats)):
                         "an": {
                             node_id:
                             {
-                                "url": str(urlcanon.parse_url(url).ssurt(), encoding="utf-8"),
+                                "identifier": str(urlcanon.parse_url(url).ssurt(), encoding="utf-8"),
                                 "TYPE": "Node"
                             }
                         }
