@@ -23,6 +23,16 @@ Use instead webarchive-commons:
 
 https://github.com/internetarchive/webarchive-commons
 
+Assuming Java and Maven are preent, build webarchive-commons as follows:
+
+```
+git clone https://github.com/internetarchive/webarchive-commons.git
+cd webarchive-commons/
+mvn clean install
+```
+
+Then look under the `target/` subdirectory for the JAR file.
+
 Run the following to generate wat.gz from some file.warc.gz or arc.gz:
 
 ```
@@ -40,5 +50,5 @@ environment to periodically execute link-indexer.
 Install the following prerequisites:
 
 ```
-# pip3 install warcio urlcanon python-dateutil retry
+# pip3 install warcio urlcanon python-dateutil retry requests
 ```
