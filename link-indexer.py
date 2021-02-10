@@ -103,10 +103,10 @@ for i in range(0, len(args.wats)):
             if not re.search("^https?://", str(warc_target_uri)) or len(str(warc_target_uri)) > args.max_url_length:
                 continue
 
-            datetime = record.rec_headers.get_header('WARC-Date')
+            dt = record.rec_headers.get_header('WARC-Date')
 
             if args.dt14:
-                datetime = dp.parse(datetime).strftime('%Y%m%d%H%M%S')
+                dt = dp.parse(dt).strftime('%Y%m%d%H%M%S')
 
             # construct node with timestamp (VersionNode)
             version_node = {
@@ -114,7 +114,7 @@ for i in range(0, len(args.wats)):
                     node_id:
                     {
                         "identifier": str(warc_target_uri.ssurt(), encoding='utf-8'),
-                        "timestamp": datetime,
+                        "timestamp": dt,
                         "TYPE": "VersionNode"
                     }
                 }
