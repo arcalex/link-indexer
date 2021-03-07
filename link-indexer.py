@@ -16,18 +16,21 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
-import re
 import sys
+import re
 import json
-import urlcanon
 import argparse
 import requests
+import urlcanon
 import dateutil.parser as dp
 import traceback
+from subprocess import run
 from retry.api import retry
 from datetime import datetime
 from urllib.parse import urljoin
 from warcio.archiveiterator import ArchiveIterator
+
+wat_jar = './webarchive-commons-jar-with-dependencies.jar'
 
 record_count = 1
 node_id = 1
@@ -43,13 +46,15 @@ nodes = 0
 
 # accept multiple WAT files as command-line arguments
 my_parser = argparse.ArgumentParser()
-my_parser.add_argument('wats', metavar='wats', nargs='+', help='list of WAT files')
+my_parser.add_argument('wats', metavar='wats',
+                       nargs='+', help='list of WAT files')
 my_parser.add_argument('--host', action='store', default='localhost')
 my_parser.add_argument('--port', action='store', type=int, default=8080)
 my_parser.add_argument('--batch_size', action='store', type=int, default=1000)
 my_parser.add_argument('--retries', action='store', type=int, default=3)
 my_parser.add_argument('--timeout', action='store', type=int, default=90)
-my_parser.add_argument('--max_url_length', action='store', type=int, default=2000)
+my_parser.add_argument(
+    '--max_url_length', action='store', type=int, default=2000)
 my_parser.add_argument('--dt14', action='store_true')
 my_parser.add_argument('--ignore_errors', action='store_true')
 
@@ -61,28 +66,54 @@ def update_graph(url, body):
     response = requests.post(url, data=body, timeout=args.timeout)
 
     print("%s %s: wats=%d batch=%d records=%d nodes=%d status=%d" % (
-        datetime.now().strftime("%b %d %H:%M:%S"),
-        os.path.basename(wat_file),
-        wats, batch, records, nodes, response.status_code), file=sys.stderr, flush=True)
+          datetime.now().strftime("%b %d %H:%M:%S"),
+          os.path.basename(wat),
+          wats, batch, records, nodes, response.status_code), file=sys.stderr, flush=True)
 
     if not response.ok:
         print("ERROR: %s" % response.content, file=sys.stderr, flush=True)
 
 
-for i in range(0, len(args.wats)):
-    wat_file = str(args.wats[i])
-    wats += 1
+def check_wat(path):
+    if path.endswith(".wat.gz"):
+        return path
 
-    with open(wat_file, 'rb') as stream:
+    x = re.sub("\.w?arc\.gz$", '', path)
+
+    # path is neither .warc.gz nor .arc.gz
+    if x == path:
+        return ''
+
+    x = x + ".wat.gz"
+
+    with open(x, "wb") as outfile:
+        rc = run(("java", "-cp", wat_jar,
+                  "org.archive.extract.ResourceExtractor", "-wat", path), stdout=outfile)
+
+    if rc.returncode != 0:
+        return ''
+
+    return x
+
+
+for i in range(0, len(args.wats)):
+    wats += 1
+    wat = check_wat(str(args.wats[i]))
+
+    if not wat:
+        continue
+
+    with open(wat, "rb") as infile:
         # loop on every record in WAT
-        for record in ArchiveIterator(stream):
+        for record in ArchiveIterator(infile):
             if record_count > args.batch_size:
                 node_id = edge_id = record_count = 1
                 batch += 1
                 request_body = ''.join(body)
 
                 try:
-                    update_graph("http://%s:%s/?operation=updateGraph" % (args.host, args.port), request_body)
+                    update_graph("http://%s:%s/?operation=updateGraph" %
+                                 (args.host, args.port), request_body)
                 except Exception as exc:
                     traceback.print_exc()
 
@@ -96,7 +127,8 @@ for i in range(0, len(args.wats)):
             if record.rec_type != 'metadata':
                 continue
 
-            warc_target_uri = urlcanon.parse_url(record.rec_headers.get_header('WARC-Target-URI'))
+            warc_target_uri = urlcanon.parse_url(
+                record.rec_headers.get_header('WARC-Target-URI'))
             urlcanon.whatwg(warc_target_uri)  # canonicalization
 
             # select only members whose WARC-Target-URI begins with "https?://"
@@ -188,4 +220,9 @@ for i in range(0, len(args.wats)):
                 except:
                     continue
 
-update_graph("http://%s:%s/?operation=updateGraph" % (args.host, args.port), request_body)
+    # WAT file was extracted on the fly
+    if wat != str(args.wats[i]):
+        os.remove(wat)
+
+update_graph("http://%s:%s/?operation=updateGraph" %
+             (args.host, args.port), request_body)
