@@ -57,13 +57,17 @@ my_parser.add_argument(
     '--max_url_length', action='store', type=int, default=2000)
 my_parser.add_argument('--dt14', action='store_true')
 my_parser.add_argument('--ignore_errors', action='store_true')
+my_parser.add_argument('--print_only', action='store_true')
 
 args = my_parser.parse_args()
 
 
 @retry(tries=args.retries)
 def update_graph(url, body):
-    response = requests.post(url, data=body, timeout=args.timeout)
+    if args.print_only:
+        print(body)
+    else:
+        response = requests.post(url, data=body, timeout=args.timeout)
 
     print("%s %s: wats=%d batch=%d records=%d nodes=%d status=%d" % (
           datetime.now().strftime("%b %d %H:%M:%S"),
