@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (C) 2020 Bibliotheca Alexandrina <https://www.bibalex.org/>
+# Copyright (C) 2020-2021 Bibliotheca Alexandrina <https://www.bibalex.org/>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,20 +18,16 @@
 import os
 import sys
 import re
-import json
 import argparse
 import requests
-import urlcanon
-import dateutil.parser as dp
 import traceback
-from subprocess import run
 from retry.api import retry
 from datetime import datetime
-from urllib.parse import urljoin
-from warcio.archiveiterator import ArchiveIterator
 
-wat_jar = './webarchive-commons-jar-with-dependencies.jar'
+from iformats import wat
+from iformats import csv
 
+path = ''
 record_count = 1
 node_id = 1
 edge_id = 1
@@ -39,25 +35,25 @@ body = []
 
 batch = 0
 
-# Cumulative total counts
-wats = 0
+# cumulative total counts
+files = 0
 records = 0
 nodes = 0
 
 # accept multiple WAT files as command-line arguments
 my_parser = argparse.ArgumentParser()
-my_parser.add_argument('wats', metavar='wats',
-                       nargs='+', help='list of WAT files')
+my_parser.add_argument('files', metavar='files', nargs='+', help='list of ARC, WARC, WAT, or CSV files')
 my_parser.add_argument('--host', action='store', default='localhost')
-my_parser.add_argument('--port', action='store', type=int, default=8080)
-my_parser.add_argument('--batch_size', action='store', type=int, default=1000)
+my_parser.add_argument('--port', action='store', type=int, default=80)
+my_parser.add_argument('--batch_size', action='store', type=int, default=100)
 my_parser.add_argument('--retries', action='store', type=int, default=3)
-my_parser.add_argument('--timeout', action='store', type=int, default=90)
-my_parser.add_argument(
-    '--max_url_length', action='store', type=int, default=2000)
+my_parser.add_argument('--timeout_network', action='store', type=int, default=90)
+my_parser.add_argument('--timeout_process', action='store', type=int, default=60)
+my_parser.add_argument('--max_identifier_length', action='store', type=int, default=2000)
 my_parser.add_argument('--dt14', action='store_true')
 my_parser.add_argument('--ignore_errors', action='store_true')
 my_parser.add_argument('--print_only', action='store_true')
+my_parser.add_argument('--keep', action='store_true')
 
 args = my_parser.parse_args()
 
@@ -65,168 +61,78 @@ args = my_parser.parse_args()
 @retry(tries=args.retries)
 def update_graph(url, body):
     if args.print_only:
-        print(body)
+        print(body, end='')
     else:
-        response = requests.post(url, data=body, timeout=args.timeout)
+        response = requests.post(url, data=body, timeout=args.timeout_network)
 
-    print("%s %s: wats=%d batch=%d records=%d nodes=%d status=%d" % (
-          datetime.now().strftime("%b %d %H:%M:%S"),
-          os.path.basename(wat),
-          wats, batch, records, nodes, response.status_code), file=sys.stderr, flush=True)
+        print("%s %s: files=%d batch=%d records=%d nodes=%d status=%d" % (
+              datetime.now().strftime("%b %d %H:%M:%S"),
+              os.path.basename(path),
+              files, batch, records, nodes, response.status_code), file=sys.stderr, flush=True)
 
-    if not response.ok:
-        print("ERROR: %s" % response.content, file=sys.stderr, flush=True)
-
-
-def check_wat(path):
-    if path.endswith(".wat.gz"):
-        return path
-
-    x = re.sub("\.w?arc\.gz$", '', path)
-
-    # path is neither .warc.gz nor .arc.gz
-    if x == path:
-        return ''
-
-    x = x + ".wat.gz"
-
-    with open(x, "wb") as outfile:
-        rc = run(("java", "-cp", wat_jar,
-                  "org.archive.extract.ResourceExtractor", "-wat", path), stdout=outfile)
-
-    if rc.returncode != 0:
-        return ''
-
-    return x
+        if not response.ok:
+            print("ERROR: %s" % response.content, file=sys.stderr, flush=True)
 
 
-for i in range(0, len(args.wats)):
-    wats += 1
-    wat = check_wat(str(args.wats[i]))
+def check_batch_size():
+    if record_count > args.batch_size:
+        globals()['nodes'] += node_id
+        globals()['batch'] += 1
+        update()
+        reset()
+        return True
 
-    if not wat:
-        continue
+    return False
 
-    with open(wat, "rb") as infile:
-        # loop on every record in WAT
-        for record in ArchiveIterator(infile):
-            if record_count > args.batch_size:
-                node_id = edge_id = record_count = 1
-                batch += 1
-                request_body = ''.join(body)
 
-                try:
-                    update_graph("http://%s:%s/?operation=updateGraph" %
-                                 (args.host, args.port), request_body)
-                except Exception as exc:
-                    traceback.print_exc()
+def update():
+    global request_body
+    request_body = ''.join(globals()['body'])
 
-                    if args.ignore_errors:
-                        continue
-                    else:
-                        sys.exit(1)
+    try:
+        update_graph("http://%s:%s/?operation=updateGraph" % (args.host, args.port), request_body)
+    except Exception as exc:
+        traceback.print_exc()
 
-                body = []
+        if not args.ignore_errors:
+            sys.exit(1)  # TODO: test this
 
-            if record.rec_type != 'metadata':
-                continue
+    globals()['body'] = []
 
-            warc_target_uri = urlcanon.parse_url(
-                record.rec_headers.get_header('WARC-Target-URI'))
-            urlcanon.whatwg(warc_target_uri)  # canonicalization
 
-            # select only members whose WARC-Target-URI begins with "https?://"
-            if not re.search("^https?://", str(warc_target_uri)) or len(str(warc_target_uri)) > args.max_url_length:
-                continue
+def reset():
+    globals()['node_id'] = globals()['edge_id'] = globals()['record_count'] = 1
+    globals()['batch'] += 1
 
-            dt = record.rec_headers.get_header('WARC-Date')
 
-            if args.dt14:
-                dt = dp.parse(dt).strftime('%Y%m%d%H%M%S')
+# callback function
+def process_record(record_json, node_id, edge_id):
+    globals()['node_id'] = node_id
+    globals()['edge_id'] = edge_id
+    globals()['record_count'] += 1
+    globals()['records'] += 1
+    globals()['body'] += record_json
 
-            # construct node with timestamp (VersionNode)
-            version_node = {
-                "an": {
-                    node_id:
-                    {
-                        "identifier": str(warc_target_uri.ssurt(), encoding='utf-8'),
-                        "timestamp": dt,
-                        "TYPE": "VersionNode"
-                    }
-                }
-            }
+    if check_batch_size():
+        return False
 
-            # \r is required as separator in the Gephi streaming format
+    return True
 
-            # https://github.com/gephi/gephi/wiki/GraphStreaming#Supported_formats
 
-            body.append(json.dumps(version_node))
-            body.append('\r\n')
+for i in range(0, len(args.files)):
+    files += 1
 
-            source_id = node_id
-            node_id += 1
-            record_count += 1
-            records += 1
+    for ifmt in (wat, csv):
+        path = ifmt.check_path(str(args.files[i]), args.timeout_process)
 
-            content = json.loads(record.raw_stream.read().decode('utf-8'))
+        if path:
+            ifmt.parse_record(path, node_id, edge_id, process_record, args.max_identifier_length, args.dt14)
 
-            try:
-                links = content["Envelope"]["Payload-Metadata"]["HTTP-Response-Metadata"]["HTML-Metadata"]["Links"]
-            except:
-                links = ''
+            # file was generated on the fly
+            if path != str(args.files[i]):
+                if not args.keep:
+                    os.remove(path)
 
-            # loop on links if not empty and get all urls
-            if links == '':
-                continue
+            break
 
-            for link in links:
-                # this is for empty outlink elements, maybe a bug in webarchive-commons used to generate WAT
-                try:
-                    # convert relative outlink to absolute one
-                    url = urljoin(str(warc_target_uri), link["url"])
-                    urlcanon.whatwg(url)  # canonicalization
-
-                    # match only urls that begin with "https?://"
-                    if not re.search("^https?://", url) or len(str(url)) > args.max_url_length:
-                        continue
-
-                    # construct node and edge
-                    node = {
-                        "an": {
-                            node_id:
-                            {
-                                "identifier": str(urlcanon.parse_url(url).ssurt(), encoding="utf-8"),
-                                "TYPE": "Node"
-                            }
-                        }
-                    }
-
-                    edge = {
-                        "ae": {
-                            edge_id:
-                            {
-                                "directed": "true",
-                                "source": str(source_id),
-                                "target": str(node_id)
-                            }
-                        }
-                    }
-
-                    body.append(json.dumps(node))
-                    body.append('\r\n')
-
-                    body.append(json.dumps(edge))
-                    body.append('\r\n')
-
-                    node_id += 1
-                    edge_id += 1
-                    nodes += 1
-                except:
-                    continue
-
-    # WAT file was extracted on the fly
-    if wat != str(args.wats[i]):
-        os.remove(wat)
-
-update_graph("http://%s:%s/?operation=updateGraph" %
-             (args.host, args.port), request_body)
+    update()
