@@ -17,7 +17,6 @@
 
 import os
 import sys
-import re
 import argparse
 import requests
 import traceback
@@ -27,13 +26,13 @@ from datetime import datetime
 from iformats import wat
 from iformats import csv
 
-path = ''
-record_count = 1
+record_count = 0
 node_id = 1
 edge_id = 1
 body = []
 
 batch = 0
+file_errors = 0
 
 # cumulative total counts
 files = 0
@@ -60,24 +59,24 @@ args = my_parser.parse_args()
 
 @retry(tries=args.retries)
 def update_graph(url, body):
-    if args.print_only:
-        print(body, end='')
-    else:
+    if not args.print_only:
         response = requests.post(url, data=body, timeout=args.timeout_network)
+        status = response.status_code
+    else:
+        print(body, end='')
+        status = ''
 
-        print("%s %s: files=%d batch=%d records=%d nodes=%d status=%d" % (
-              datetime.now().strftime("%b %d %H:%M:%S"),
-              os.path.basename(path),
-              files, batch, records, nodes, response.status_code), file=sys.stderr, flush=True)
+    print("%s %s: file#=%d batch#=%d records=%d nodes=%d status=%s" % (
+          datetime.now().strftime("%b %d %H:%M:%S"),
+          os.path.basename(path),
+          files, batch, records, nodes, status), file=sys.stderr, flush=True)
 
-        if not response.ok:
-            print("ERROR: %s" % response.content, file=sys.stderr, flush=True)
+    if not args.print_only and not response.ok:
+        print("ERROR: %s" % response.content, file=sys.stderr, flush=True)
 
 
 def check_batch_size():
-    if record_count > args.batch_size:
-        globals()['nodes'] += node_id
-        globals()['batch'] += 1
+    if record_count == args.batch_size:
         update()
         reset()
         return True
@@ -86,23 +85,26 @@ def check_batch_size():
 
 
 def update():
-    global request_body
+    globals()['nodes'] += node_id
+    globals()['batch'] += 1
     request_body = ''.join(globals()['body'])
 
     try:
         update_graph("http://%s:%s/?operation=updateGraph" % (args.host, args.port), request_body)
     except Exception as exc:
+        globals()['file_errors'] += 1
         traceback.print_exc()
 
         if not args.ignore_errors:
             sys.exit(1)  # TODO: test this
 
+    # must clear here, not in reset(), if only update() in file loop
     globals()['body'] = []
 
 
 def reset():
-    globals()['node_id'] = globals()['edge_id'] = globals()['record_count'] = 1
-    globals()['batch'] += 1
+    globals()['record_count'] = 0
+    globals()['node_id'] = globals()['edge_id'] = 1
 
 
 # callback function
@@ -120,6 +122,7 @@ def process_record(record_json, node_id, edge_id):
 
 
 for i in range(0, len(args.files)):
+    file_errors = 0
     files += 1
 
     for ifmt in (wat, csv):
@@ -135,4 +138,9 @@ for i in range(0, len(args.files)):
 
             break
 
+    # if followed by reset(), record_count (batch) resets with a new file
     update()
+
+    print("%s %s: (%d)" % (
+          datetime.now().strftime("%b %d %H:%M:%S"),
+          os.path.basename(path), file_errors), file=sys.stderr, flush=True)
