@@ -26,6 +26,9 @@ from warcio.archiveiterator import ArchiveIterator
 
 wat_jar = './webarchive-commons-jar-with-dependencies.jar'
 
+previous_uri = ''
+previous_dt = ''
+
 
 def check_path(path, timeout_process):
     if path.endswith(".wat.gz"):
@@ -73,6 +76,13 @@ def parse_record(path, node_id, edge_id, process_record, max_identifier_length, 
 
             if dt14:
                 dt = dp.parse(dt).strftime('%Y%m%d%H%M%S')
+                
+            # exclude consecutive records with same identifier and timestamp
+            if str(warc_target_uri) == previous_uri and dt == previous_dt:
+                continue
+
+            globals()['previous_uri'] = str(warc_target_uri)
+            globals()['previous_dt'] = dt
 
             # construct node with timestamp (VersionNode)
             version_node = {
