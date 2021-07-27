@@ -16,6 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import dateutil.parser as dp
+import urlcanon
 import json
 
 
@@ -36,7 +37,8 @@ def parse_record(path, node_id, edge_id, process_record, max_identifier_length, 
             fields = line.split(',')
             identifier = fields[0]
             dt = fields[1]
-            outlink = fields[2].rstrip()
+            outlink = urlcanon.parse_url(fields[2].rstrip())
+            urlcanon.whatwg(outlink)  # canonicalization
 
             if dt14:
                 dt = dp.parse(dt).strftime('%Y%m%d%H%M%S')
@@ -57,7 +59,7 @@ def parse_record(path, node_id, edge_id, process_record, max_identifier_length, 
                     "an": {
                         node_id:
                             {
-                                "identifier": identifier,
+                                "identifier": str(urlcanon.whatwg(urlcanon.parse_url(fields[0])).ssurt(), encoding='utf-8'),
                                 "timestamp": dt,
                                 "TYPE": "VersionNode"
                             }
@@ -77,7 +79,7 @@ def parse_record(path, node_id, edge_id, process_record, max_identifier_length, 
                     "an": {
                         node_id:
                             {
-                                "identifier": outlink,
+                                "identifier": str(outlink.ssurt(), encoding='utf-8'),
                                 "TYPE": "Node"
                             }
                     }
