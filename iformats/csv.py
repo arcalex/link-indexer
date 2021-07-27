@@ -36,7 +36,7 @@ def parse_record(path, node_id, edge_id, process_record, max_identifier_length, 
             fields = line.split(',')
             identifier = fields[0]
             dt = fields[1]
-            outlink = fields[2]
+            outlink = fields[2].rstrip()
 
             if dt14:
                 dt = dp.parse(dt).strftime('%Y%m%d%H%M%S')
