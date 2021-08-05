@@ -50,5 +50,5 @@ environment to periodically execute link-indexer.
 Install the following prerequisites:
 
 ```
-# pip3 install warcio urlcanon python-dateutil retry requests
+# pip3 install warcio urlcanon python-dateutil retry requests configargparse
 ```

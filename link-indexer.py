@@ -17,9 +17,9 @@
 
 import os
 import sys
-import argparse
 import requests
 import traceback
+import configargparse
 from retry.api import retry
 from datetime import datetime
 
@@ -39,8 +39,9 @@ files = 0
 records = 0
 nodes = 0
 
-# accept multiple WAT files as command-line arguments
-my_parser = argparse.ArgumentParser()
+# accept multiple input files as command-line arguments
+my_parser = configargparse.ArgParser(default_config_files=['link-indexer.conf'])
+my_parser.add_argument('-c', '--config', required=False, is_config_file=True, help='config file path')
 my_parser.add_argument('files', metavar='files', nargs='+', help='list of ARC, WARC, WAT, or CSV files')
 my_parser.add_argument('--host', action='store', default='localhost')
 my_parser.add_argument('--port', action='store', type=int, default=80)
