@@ -43,6 +43,7 @@ nodes = 0
 my_parser = configargparse.ArgParser(default_config_files=['link-indexer.conf'])
 my_parser.add_argument('-c', '--config', required=False, is_config_file=True, help='config file path')
 my_parser.add_argument('files', metavar='files', nargs='+', help='list of ARC, WARC, WAT, or CSV files')
+my_parser.add_argument('--api_key', action='store')
 my_parser.add_argument('--host', action='store', default='localhost')
 my_parser.add_argument('--port', action='store', type=int, default=80)
 my_parser.add_argument('--batch_size', action='store', type=int, default=100)
@@ -61,7 +62,10 @@ args = my_parser.parse_args()
 @retry(tries=args.retries)
 def update_graph(url, body):
     if not args.print_only:
-        response = requests.post(url, data=body, timeout=args.timeout_network)
+        if args.api_key:
+            response = requests.post(url, data=body, timeout=args.timeout_network, headers={'API_KEY': args.api_key})
+        else:
+            response = requests.post(url, data=body, timeout=args.timeout_network)
         status = response.status_code
     else:
         print(body, end='')
