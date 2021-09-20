@@ -72,7 +72,18 @@ def parse_record(path, node_id, edge_id, process_record, max_identifier_length, 
             if not re.search("^https?://", str(warc_target_uri)) or len(str(warc_target_uri)) > max_identifier_length:
                 continue
 
-            dt = record.rec_headers.get_header('WARC-Date')
+            content = json.loads(record.raw_stream.read().decode('utf-8'))
+
+            try:
+                links = content["Envelope"]["Payload-Metadata"]["HTTP-Response-Metadata"]["HTML-Metadata"]["Links"]
+            except:
+                links = ''
+
+            # WARC-Date from Envelope, not WAT record header (#17)
+            try:
+                dt = content["Envelope"]["WARC-Header-Metadata"]["WARC-Date"]
+            except:
+                dt = ''
 
             if dt14:
                 dt = dp.parse(dt).strftime('%Y%m%d%H%M%S')
@@ -80,7 +91,6 @@ def parse_record(path, node_id, edge_id, process_record, max_identifier_length, 
             # exclude consecutive records with same identifier and timestamp
             if str(warc_target_uri) == previous_uri and dt == previous_dt:
                 continue
-
             globals()['previous_uri'] = str(warc_target_uri)
             globals()['previous_dt'] = dt
 
@@ -101,13 +111,6 @@ def parse_record(path, node_id, edge_id, process_record, max_identifier_length, 
 
             source_id = node_id
             node_id += 1
-
-            content = json.loads(record.raw_stream.read().decode('utf-8'))
-
-            try:
-                links = content["Envelope"]["Payload-Metadata"]["HTTP-Response-Metadata"]["HTML-Metadata"]["Links"]
-            except:
-                links = ''
 
             # loop on links if not empty and get all urls
             if links != '':
