@@ -21,12 +21,12 @@ https://github.com/webrecorder/warcio/issues/102
 
 Use instead webarchive-commons:
 
-https://github.com/internetarchive/webarchive-commons
+https://github.com/iipc/webarchive-commons
 
-Assuming Java and Maven are preent, build webarchive-commons as follows:
+Assuming Java and Maven are there, build webarchive-commons as follows:
 
 ```
-git clone https://github.com/internetarchive/webarchive-commons.git
+git clone https://github.com/iipc/webarchive-commons.git
 cd webarchive-commons/
 mvn clean install
 ```
