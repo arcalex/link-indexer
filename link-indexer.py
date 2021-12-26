@@ -22,6 +22,7 @@ import traceback
 import configargparse
 from retry.api import retry
 from datetime import datetime
+from subprocess import TimeoutExpired
 
 from iformats import wat
 from iformats import csv
@@ -98,7 +99,12 @@ def update():
         update_graph("http://%s:%s/?operation=updateGraph" % (args.host, args.port), request_body)
     except Exception as exc:
         globals()['file_errors'] += 1
-        traceback.print_exc()
+        #traceback.print_exc()
+        
+        print("%s %s: file#=%d batch#=%d records=%d nodes=%d status=%s" % (
+            datetime.now().strftime("%b %d %H:%M:%S"),
+            os.path.basename(path),
+            files, batch, records, nodes, type(exc).__name__), file=sys.stderr, flush=True)
 
         if not args.ignore_errors:
             sys.exit(1)  # TODO: test this
@@ -133,6 +139,12 @@ for i in range(0, len(args.files)):
     for ifmt in (wat, csv):
         path = ifmt.check_path(str(args.files[i]), args.timeout_process)
 
+        if isinstance(path, TimeoutExpired):
+            print("%s %s: (%s)" % (
+                datetime.now().strftime("%b %d %H:%M:%S"),
+                os.path.basename(str(args.files[i])), "timeout_process"), file=sys.stderr, flush=True)
+            break
+
         if path:
             ifmt.parse_record(path, node_id, edge_id, process_record, args.max_identifier_length, args.dt14)
 
@@ -141,11 +153,9 @@ for i in range(0, len(args.files)):
                 if not args.keep:
                     os.remove(path)
 
+            # if followed by reset(), record_count (batch) resets with a new file
+            update()
+            print("%s %s: (%d)" % (
+                datetime.now().strftime("%b %d %H:%M:%S"),
+                os.path.basename(path), file_errors), file=sys.stderr, flush=True)
             break
-
-    # if followed by reset(), record_count (batch) resets with a new file
-    update()
-
-    print("%s %s: (%d)" % (
-          datetime.now().strftime("%b %d %H:%M:%S"),
-          os.path.basename(path), file_errors), file=sys.stderr, flush=True)
