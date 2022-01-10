@@ -49,9 +49,9 @@ def check_path(path, timeout_process):
 
             if rc.returncode != 0:
                 return ''
-        except TimeoutExpired:
+        except TimeoutExpired as exc:
             os.remove(x)
-            return ''
+            return exc
 
     return x
 
