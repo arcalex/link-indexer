@@ -29,8 +29,8 @@ def check_path(path, timeout_process):
 
 def parse_record(path, node_id, edge_id, process_record, max_identifier_length, dt14):
     # reference identifier and timestamp
-    identifier0 = ""
-    dt0 = ""
+    identifier0 = ''
+    dt0 = ''
 
     with open(path) as infile:
         for line in infile:
@@ -44,7 +44,7 @@ def parse_record(path, node_id, edge_id, process_record, max_identifier_length, 
                 dt = dp.parse(dt).strftime('%Y%m%d%H%M%S')
 
             if (identifier, dt) != (identifier0, dt0):
-                if identifier0 != "" and dt0 != "":
+                if identifier0 != '' and dt0 != '':
                     # this is a new record, invoke the callback function
                     same_batch = process_record(record_array, node_id, edge_id)
 

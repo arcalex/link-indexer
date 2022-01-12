@@ -56,30 +56,24 @@ my_parser.add_argument('--dt14', action='store_true')
 my_parser.add_argument('--ignore_errors', action='store_true')
 my_parser.add_argument('--print_only', action='store_true')
 my_parser.add_argument('--keep', action='store_true')
+my_parser.add_argument('--debug', action='store_true')
 
 args = my_parser.parse_args()
 
 
 @retry(tries=args.retries)
 def update_graph(url, body):
+    response = None
+
     if not args.print_only:
         if args.api_key:
             response = requests.post(url, data=body, timeout=args.timeout_network, headers={'API_KEY': args.api_key})
         else:
             response = requests.post(url, data=body, timeout=args.timeout_network)
-        status = response.status_code
     else:
         print(body, end='')
-        status = ''
 
-    print("%s %s: file#=%d batch#=%d records=%d nodes=%d status=%s" % (
-          datetime.now().strftime("%b %d %H:%M:%S"),
-          os.path.basename(path),
-          files, batch, records, nodes, status), file=sys.stderr, flush=True)
-
-    if not args.print_only and not response.ok:
-        print("ERROR: %s" % response.content, file=sys.stderr, flush=True)
-
+    return response
 
 def check_batch_size():
     if record_count == args.batch_size:
@@ -93,24 +87,38 @@ def check_batch_size():
 def update():
     globals()['nodes'] += node_id
     globals()['batch'] += 1
+    response = None
+    status = ''
     request_body = ''.join(globals()['body'])
 
     try:
-        update_graph("http://%s:%s/?operation=updateGraph" % (args.host, args.port), request_body)
+        response = update_graph("http://%s:%s/?operation=updateGraph" % (args.host, args.port), request_body)
+
+        if response:
+            status = response.status_code
     except Exception as exc:
         globals()['file_errors'] += 1
-        #traceback.print_exc()
-        
-        print("%s %s: file#=%d batch#=%d records=%d nodes=%d status=%s" % (
-            datetime.now().strftime("%b %d %H:%M:%S"),
-            os.path.basename(path),
-            files, batch, records, nodes, type(exc).__name__), file=sys.stderr, flush=True)
+        status = type(exc).__name__
 
-        if not args.ignore_errors:
-            sys.exit(1)  # TODO: test this
+        if args.debug:
+            traceback.print_exc()
+
+    print("%s %s: file#=%d batch#=%d records=%d nodes=%d status=%s" % (
+        datetime.now().strftime("%b %d %H:%M:%S"),
+        os.path.basename(path),
+        files, batch, records, nodes, status), file=sys.stderr, flush=True)
+
+    if not args.print_only and response and not response.ok:
+        if args.debug:
+            print("ERROR: %s" % response.content, file=sys.stderr, flush=True)
+
+        globals()['file_errors'] += 1
 
     # must clear here, not in reset(), if only update() in file loop
     globals()['body'] = []
+
+    if status != 200 and not args.ignore_errors:
+        sys.exit(1)
 
 
 def reset():
