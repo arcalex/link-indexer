@@ -94,7 +94,7 @@ def update():
     try:
         response = update_graph("http://%s:%s/?operation=updateGraph" % (args.host, args.port), request_body)
 
-        if response:
+        if response is not None:
             status = response.status_code
     except Exception as exc:
         globals()['file_errors'] += 1
@@ -108,7 +108,7 @@ def update():
         os.path.basename(path),
         files, batch, records, nodes, status), file=sys.stderr, flush=True)
 
-    if not args.print_only and response and not response.ok:
+    if not args.print_only and not response:
         if args.debug:
             print("ERROR: %s" % response.content, file=sys.stderr, flush=True)
 
