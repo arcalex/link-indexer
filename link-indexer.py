@@ -147,13 +147,7 @@ for i in range(0, len(args.files)):
     for ifmt in (wat, csv):
         path = ifmt.check_path(str(args.files[i]), args.timeout_process)
 
-        if isinstance(path, TimeoutExpired):
-            print("%s %s: (%s)" % (
-                datetime.now().strftime("%b %d %H:%M:%S"),
-                os.path.basename(str(args.files[i])), "timeout_process"), file=sys.stderr, flush=True)
-            break
-
-        if path:
+        if path:  # not empty and not None
             ifmt.parse_record(path, node_id, edge_id, process_record, args.max_identifier_length, args.dt14)
 
             # file was generated on the fly
@@ -166,4 +160,9 @@ for i in range(0, len(args.files)):
             print("%s %s: (%d)" % (
                 datetime.now().strftime("%b %d %H:%M:%S"),
                 os.path.basename(path), file_errors), file=sys.stderr, flush=True)
+            break
+        elif path is None:
+            print("%s %s: (%s)" % (
+                datetime.now().strftime("%b %d %H:%M:%S"),
+                os.path.basename(str(args.files[i])), "check_path"), file=sys.stderr, flush=True)
             break

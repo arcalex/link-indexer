@@ -48,10 +48,11 @@ def check_path(path, timeout_process):
                       "org.archive.extract.ResourceExtractor", "-wat", path), stdout=outfile, timeout=timeout_process)
 
             if rc.returncode != 0:
-                return ''
-        except TimeoutExpired as exc:
-            os.remove(x)
-            return exc
+                return None
+        except:  # including TimeoutExpired
+            if os.path.exists(x):
+                os.remove(x)
+            return None
 
     return x
 
