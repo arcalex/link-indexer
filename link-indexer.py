@@ -97,7 +97,6 @@ def update():
         if response is not None:
             status = response.status_code
     except Exception as exc:
-        globals()['file_errors'] += 1
         status = type(exc).__name__
 
         if args.debug:
@@ -141,7 +140,6 @@ def process_record(record_json, node_id, edge_id):
 
 
 for i in range(0, len(args.files)):
-    file_errors = 0
     files += 1
 
     for ifmt in (wat, csv):
@@ -159,7 +157,7 @@ for i in range(0, len(args.files)):
             update()
             print("%s %s: (%d)" % (
                 datetime.now().strftime("%b %d %H:%M:%S"),
-                os.path.basename(path), file_errors), file=sys.stderr, flush=True)
+                os.path.basename(path), globals()['file_errors']), file=sys.stderr, flush=True)
             break
         elif path is None:
             print("%s %s: (%s)" % (
