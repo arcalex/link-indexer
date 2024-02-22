@@ -34,6 +34,14 @@ git clone https://github.com/commoncrawl/ia-hadoop-tools
 cd ia-hadoop-tools
 mvn package
 ```
+If the build of ia-hadoop-tools fails, you can clone this fork instead.
+
+```
+git clone https://github.com/AmrSheta22/ia-hadoop-tools.git
+cd ia-hadoop-tools
+mvn package -Dhttps.protocols=TLSv1,TLSv1.1,TLSv1.2
+```
+
 Note that the WARC file must be placed in a folder warc/
 
 Run the following to generate wat.gz from some file.warc.gz or arc.gz:
